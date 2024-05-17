@@ -9,15 +9,26 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/trackit/api/product")
-public class ProductController {
-
+@RequestMapping("/trackit/api/order")
+public class OrderController {
     @Autowired
     private OrderService orderService;
 
-    @GetMapping("/test")
-    public ResponseEntity<String> getTestApi() {
+    @GetMapping("/tiki")
+    public ResponseEntity<String> getOrderTiki() {
         String testString = orderService.getOrderTiki();
+        return new ResponseEntity<String>(testString, HttpStatus.OK);
+    }
+
+    @GetMapping("/shopee")
+    public ResponseEntity<String> getOrderShopee() {
+        String testString = orderService.getOrderShopee();
+        return new ResponseEntity<String>(testString, HttpStatus.OK);
+    }
+
+    @GetMapping("/lazada")
+    public ResponseEntity<String> getOrderLazada() {
+        String testString = orderService.getOrderLazada();
         return new ResponseEntity<String>(testString, HttpStatus.OK);
     }
 }
