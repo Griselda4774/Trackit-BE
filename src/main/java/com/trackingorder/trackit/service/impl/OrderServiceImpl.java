@@ -1,6 +1,7 @@
 package com.trackingorder.trackit.service.impl;
 
 import com.trackingorder.trackit.chromedriver.ChromeDriverBuilder;
+import com.trackingorder.trackit.dto.AccountDTO;
 import com.trackingorder.trackit.service.OrderService;
 import org.openqa.selenium.By;
 import org.openqa.selenium.JavascriptExecutor;
@@ -32,23 +33,13 @@ public class OrderServiceImpl implements OrderService {
         wait(1);
     }
 
-    @Override
-    public String getOrderTiki() {
-//        System.setProperty("webdriver.chrome.driver", "D:\\ChromeDriver\\chromedriver-win64\\chromedriver.exe");
-//        WebDriver driver = new ChromeDriver();
+    public static WebDriver initDriver(String driverPath, String chromeTestingBinaryPath) {
+        // Set the path for the ChromeDriver executable
+        System.setProperty("webdriver.chrome.driver", driverPath);
 
-        String driver_home = "D:\\ChromeDriver\\chromedriver-win64\\chromedriver.exe";
-        System.setProperty("webdriver.chrome.driver", driver_home);
-
-//        ChromeOptions chrome_options = new ChromeOptions();
-//        chrome_options.addArguments("--window-size=1920,1080");
-        //chrome_options.addArguments("--headless=new"); when chromedriver > 108.x.x.x
-        //chrome_options.addArguments("--headless=chrome"); when chromedriver <= 108.x.x.x
-
-        String chromeTestingBinaryPath = "D:\\Chrome\\chrome-win64\\chrome.exe";
-
+        // Create ChromeOptions to customize Chrome browser settings
         ChromeOptions options = new ChromeOptions();
-        options.setBinary(chromeTestingBinaryPath);
+        options.setBinary(chromeTestingBinaryPath); // Set the Chrome Testing binary path
         options.addArguments("--no-sandbox");
         options.addArguments("--disable-dev-shm-usage");
         options.addArguments("--disable-blink-features=AutomationControlled");
@@ -56,32 +47,32 @@ public class OrderServiceImpl implements OrderService {
         options.addArguments("--disable-infobars");
         options.setExperimentalOption("excludeSwitches", Collections.singletonList("enable-automation"));
 
+        // Initialize WebDriver with ChromeOptions
         WebDriver driver = new ChromeDriver(options);
 
+        // Maximize the browser window
         driver.manage().window().maximize();
 
+        // Optionally, remove the navigator.webdriver property to reduce bot detection
         ((JavascriptExecutor) driver).executeScript("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})");
 
-//        ChromeDriverService service = new ChromeDriverService.Builder()
-//                .usingDriverExecutable(new File(driver_home))
-//                .usingAnyFreePort()
-//                .build();
+        return driver;
+    }
 
-        //ChromeDriver chromeDriver1 = new ChromeDriver(service);
-//        ChromeDriver driver = new ChromeDriverBuilder()
-//                .build(options, driver_home);
+    @Override
+    public String getOrderTiki(AccountDTO accountDTO) {
+        String driverPath = "D:\\ChromeDriver\\chromedriver-win64\\chromedriver.exe";
+        String chromeTestingBinaryPath = "D:\\Chrome\\chrome-win64\\chrome.exe";
 
-
-
-
+        WebDriver driver = initDriver(driverPath, chromeTestingBinaryPath);
         driver.get("https://tiki.vn/");
-        wait(5);
+        wait(2);
         String pageSource = driver.getPageSource();
 
         // Open login dialog
         WebElement accountButton = driver.findElement(By.xpath("//div[span[text()='Tài khoản']]"));
         accountButton.click();
-        wait(5);
+        wait(2);
 
         // Enter phone num
         pageSource = driver.getPageSource();
@@ -89,7 +80,7 @@ public class OrderServiceImpl implements OrderService {
         usernameInput.sendKeys("0971669507");
         WebElement continueButton = driver.findElement(By.xpath("//button[text()='Tiếp Tục']"));
         continueButton.click();
-        wait(5);
+        wait(2);
 
         // Enter password
         pageSource = driver.getPageSource();
@@ -97,16 +88,13 @@ public class OrderServiceImpl implements OrderService {
         passwordInput.sendKeys("06082003DinhTam");
         WebElement loginButton = driver.findElement(By.xpath("//button[text()='Đăng Nhập']"));
         loginButton.click();
-        wait(5);
+        wait(2);
 
         // Solve CAPTCHA
-        wait(10);
+        wait(0);
 
         // Move to order
-        accountButton = driver.findElement(By.xpath("//div[span[text()='Tài khoản']]"));
-        moveCursor(driver, accountButton);
-        WebElement orderLinkTag = driver.findElement(By.xpath("//div[a[p[text()='Đơn hàng của tôi']]]"));
-        orderLinkTag.click();
+        driver.get("https://tiki.vn/sales/order/history");
         wait(5);
 
         List<WebElement> viewDetailButtons = driver.findElements(By.xpath("//div[text()='Xem chi tiết']"));
@@ -131,8 +119,10 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     public String getOrderShopee() {
-        System.setProperty("webdriver.chrome.driver", "D:\\ChromeDriver\\chromedriver-win64\\chromedriver.exe");
-        WebDriver driver = new ChromeDriver();
+        String driverPath = "D:\\ChromeDriver\\chromedriver-win64\\chromedriver.exe";
+        String chromeTestingBinaryPath = "D:\\Chrome\\chrome-win64\\chrome.exe";
+
+        WebDriver driver = initDriver(driverPath, chromeTestingBinaryPath);
         driver.get("https://shopee.vn/buyer/login");
         wait(5);
         String pageSource = driver.getPageSource();
@@ -160,8 +150,10 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     public String getOrderLazada() {
-        System.setProperty("webdriver.chrome.driver", "D:\\ChromeDriver\\chromedriver-win64\\chromedriver.exe");
-        WebDriver driver = new ChromeDriver();
+        String driverPath = "D:\\ChromeDriver\\chromedriver-win64\\chromedriver.exe";
+        String chromeTestingBinaryPath = "D:\\Chrome\\chrome-win64\\chrome.exe";
+
+        WebDriver driver = initDriver(driverPath, chromeTestingBinaryPath);
         driver.get("https://member.lazada.vn/user/login");
         wait(5);
         String pageSource = driver.getPageSource();
