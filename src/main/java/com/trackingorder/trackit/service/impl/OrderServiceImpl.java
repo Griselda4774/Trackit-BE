@@ -1,7 +1,9 @@
 package com.trackingorder.trackit.service.impl;
 
+import com.trackingorder.trackit.chromedriver.ChromeDriverBuilder;
 import com.trackingorder.trackit.service.OrderService;
 import org.openqa.selenium.By;
+import org.openqa.selenium.JavascriptExecutor;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
 import org.openqa.selenium.chrome.ChromeDriver;
@@ -12,10 +14,7 @@ import org.springframework.stereotype.Service;
 
 import javax.swing.text.html.Option;
 import java.io.File;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 
 @Service
@@ -35,24 +34,44 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     public String getOrderTiki() {
-        System.setProperty("webdriver.chrome.driver", "D:\\ChromeDriver\\chromedriver-win64\\chromedriver.exe");
-        WebDriver driver = new ChromeDriver();
+//        System.setProperty("webdriver.chrome.driver", "D:\\ChromeDriver\\chromedriver-win64\\chromedriver.exe");
+//        WebDriver driver = new ChromeDriver();
 
-//        String driver_home = "D:\\ChromeDriver\\chromedriver-win64\\chromedriver.exe";
-//
+        String driver_home = "D:\\ChromeDriver\\chromedriver-win64\\chromedriver.exe";
+        System.setProperty("webdriver.chrome.driver", driver_home);
+
 //        ChromeOptions chrome_options = new ChromeOptions();
 //        chrome_options.addArguments("--window-size=1920,1080");
-//        //chrome_options.addArguments("--headless=new"); when chromedriver > 108.x.x.x
-//        //chrome_options.addArguments("--headless=chrome"); when chromedriver <= 108.x.x.x
-//
+        //chrome_options.addArguments("--headless=new"); when chromedriver > 108.x.x.x
+        //chrome_options.addArguments("--headless=chrome"); when chromedriver <= 108.x.x.x
+
+        String chromeTestingBinaryPath = "D:\\Chrome\\chrome-win64\\chrome.exe";
+
+        ChromeOptions options = new ChromeOptions();
+        options.setBinary(chromeTestingBinaryPath);
+        options.addArguments("--no-sandbox");
+        options.addArguments("--disable-dev-shm-usage");
+        options.addArguments("--disable-blink-features=AutomationControlled");
+        options.addArguments("--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.6422.60 Safari/537.36");
+        options.addArguments("--disable-infobars");
+        options.setExperimentalOption("excludeSwitches", Collections.singletonList("enable-automation"));
+
+        WebDriver driver = new ChromeDriver(options);
+
+        driver.manage().window().maximize();
+
+        ((JavascriptExecutor) driver).executeScript("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})");
+
 //        ChromeDriverService service = new ChromeDriverService.Builder()
 //                .usingDriverExecutable(new File(driver_home))
 //                .usingAnyFreePort()
 //                .build();
-//
-//        //ChromeDriver chromeDriver1 = new ChromeDriver(service);
+
+        //ChromeDriver chromeDriver1 = new ChromeDriver(service);
 //        ChromeDriver driver = new ChromeDriverBuilder()
-//                .build(chrome_options,driver_home);
+//                .build(options, driver_home);
+
+
 
 
         driver.get("https://tiki.vn/");
