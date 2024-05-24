@@ -5,15 +5,14 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.util.Date;
+
 @Getter
 @Setter
 @AllArgsConstructor
 @NoArgsConstructor
-public class ProductDTO {
-    private String name;
-    private String providedBy;
-    private String imageUrl;
-    private double price;
-    private String productOption;
-    private int quantity;
+public class StatusDetailDTO {
+   private Date date;
+   private String title;
+   private String content;
 }

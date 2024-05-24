@@ -10,8 +10,8 @@ import lombok.Setter;
 @AllArgsConstructor
 @NoArgsConstructor
 public class ShippingMethodDTO {
-    private String shippingType;
-    private String arrivalTime;
+//    private String shippingType;
+//    private String arrivalTime;
     private String shippedBy;
     private double price;
     private double discount;

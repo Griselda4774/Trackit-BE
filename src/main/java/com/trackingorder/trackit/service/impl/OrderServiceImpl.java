@@ -1,20 +1,21 @@
 package com.trackingorder.trackit.service.impl;
 
-import com.trackingorder.trackit.chromedriver.ChromeDriverBuilder;
-import com.trackingorder.trackit.dto.AccountDTO;
+import com.trackingorder.trackit.dto.*;
 import com.trackingorder.trackit.service.OrderService;
 import org.openqa.selenium.By;
 import org.openqa.selenium.JavascriptExecutor;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
 import org.openqa.selenium.chrome.ChromeDriver;
-import org.openqa.selenium.chrome.ChromeDriverService;
 import org.openqa.selenium.chrome.ChromeOptions;
 import org.openqa.selenium.interactions.Actions;
 import org.springframework.stereotype.Service;
 
-import javax.swing.text.html.Option;
-import java.io.File;
+import java.text.ParsePosition;
+import java.text.SimpleDateFormat;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 
@@ -33,7 +34,22 @@ public class OrderServiceImpl implements OrderService {
         wait(1);
     }
 
-    public static WebDriver initDriver(String driverPath, String chromeTestingBinaryPath) {
+    public static float parseCurrencyToFloat(String currencyString) {
+        String cleanedString = currencyString.replace("₫", "").trim();
+        cleanedString = cleanedString.replace(".", "");
+        return Float.parseFloat(cleanedString);
+    }
+
+    public static Date parseStringToDate(String dateString) {
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("HH:mm dd-MM-yyyy");
+        LocalDateTime localDateTime = LocalDateTime.parse(dateString, formatter);
+        return Date.from(localDateTime.atZone(ZoneId.systemDefault()).toInstant());
+    }
+
+    public static WebDriver initDriver() {
+        String driverPath = "D:\\ChromeDriver\\chromedriver-win64\\chromedriver.exe";
+        String chromeTestingBinaryPath = "D:\\Chrome\\chrome-win64\\chrome.exe";
+
         // Set the path for the ChromeDriver executable
         System.setProperty("webdriver.chrome.driver", driverPath);
 
@@ -61,10 +77,7 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     public String getOrderTiki(AccountDTO accountDTO) {
-        String driverPath = "D:\\ChromeDriver\\chromedriver-win64\\chromedriver.exe";
-        String chromeTestingBinaryPath = "D:\\Chrome\\chrome-win64\\chrome.exe";
-
-        WebDriver driver = initDriver(driverPath, chromeTestingBinaryPath);
+        WebDriver driver = initDriver();
         driver.get("https://tiki.vn/");
         wait(2);
         String pageSource = driver.getPageSource();
@@ -77,7 +90,7 @@ public class OrderServiceImpl implements OrderService {
         // Enter phone num
         pageSource = driver.getPageSource();
         WebElement usernameInput = driver.findElement(By.xpath("//input[@placeholder='Số điện thoại']"));
-        usernameInput.sendKeys("0971669507");
+        usernameInput.sendKeys(accountDTO.getUsername());
         WebElement continueButton = driver.findElement(By.xpath("//button[text()='Tiếp Tục']"));
         continueButton.click();
         wait(2);
@@ -85,7 +98,7 @@ public class OrderServiceImpl implements OrderService {
         // Enter password
         pageSource = driver.getPageSource();
         WebElement passwordInput = driver.findElement(By.xpath("//input[@placeholder='Mật khẩu']"));
-        passwordInput.sendKeys("06082003DinhTam");
+        passwordInput.sendKeys(accountDTO.getPassword());
         WebElement loginButton = driver.findElement(By.xpath("//button[text()='Đăng Nhập']"));
         loginButton.click();
         wait(2);
@@ -118,51 +131,223 @@ public class OrderServiceImpl implements OrderService {
     }
 
     @Override
-    public String getOrderShopee() {
-        String driverPath = "D:\\ChromeDriver\\chromedriver-win64\\chromedriver.exe";
-        String chromeTestingBinaryPath = "D:\\Chrome\\chrome-win64\\chrome.exe";
-
-        WebDriver driver = initDriver(driverPath, chromeTestingBinaryPath);
+    public MessageDTO getOrderShopee(AccountDTO accountDTO) {
+        WebDriver driver = initDriver();
         driver.get("https://shopee.vn/buyer/login");
         wait(5);
         String pageSource = driver.getPageSource();
 
         // Enter phone num and pass
         WebElement usernameInput = driver.findElement(By.xpath("//input[@placeholder='Email/Số điện thoại/Tên đăng nhập']"));
-        usernameInput.sendKeys("0971669507");
+        usernameInput.sendKeys(accountDTO.getUsername());
         WebElement passwordInput = driver.findElement(By.xpath("//input[@placeholder='Mật khẩu']"));
-        passwordInput.sendKeys("Dinhtam080803");
+        passwordInput.sendKeys(accountDTO.getPassword());
         wait(1);
         WebElement loginButton = driver.findElement(By.xpath("//button[text()='Đăng nhập']"));
         loginButton.click();
-        wait(5);
-
-        // Solve CAPTCHA
         wait(10);
 
-        // Move to order
+//         Verify
+        try {
+            WebElement verifyButton = driver.findElement(By.xpath("//button[div[text()='Xác minh bằng liên kết Email']]"));
+            verifyButton.click();
+            wait(60);
+        }
+        catch (Exception e) {
+            e.printStackTrace();
+        }
 
+
+        // Move to order
+        driver.get("https://shopee.vn/user/purchase");
         wait(5);
 
-        pageSource = driver.getPageSource();
-        return pageSource.toString();
+
+        // Get order info
+        List<WebElement> purchaseOrderLinks;
+        List<OrderDTO> orderList = new ArrayList<OrderDTO>();
+        int orderListSize = 0;
+
+        while (true) {
+            // Show full order
+            ((JavascriptExecutor) driver).executeScript("window.scrollTo(0, document.body.scrollHeight);");
+            wait(1);
+            int newLen = driver.findElements(By.xpath("//a[contains(@href, '/user/purchase/order/')]")).size();
+            if (newLen == orderListSize || orderListSize >= 40)
+                break;
+            else orderListSize = newLen;
+        }
+
+        purchaseOrderLinks = driver.findElements(By.xpath("//a[contains(@href, '/user/purchase/order/')]"));
+        List<String> orderHrefs = new ArrayList<>();
+        for (WebElement link : purchaseOrderLinks) {
+            String href = link.getAttribute("href").toString();
+            if (!orderHrefs.contains(href))
+                orderHrefs.add(href);
+        }
+
+        for (String orderHref : orderHrefs) {
+//            purchaseOrderLinks.get(i).click();
+            driver.get(orderHref);
+            wait(2);
+
+            OrderDTO order = new OrderDTO();
+            order.setOrderDetailList(new ArrayList<OrderDetailDTO>());
+
+            // Get order detail info
+            List<WebElement> orderDetailElements = driver.findElements(By.xpath("//section[a[@class='mZ1OWk']]"));
+            for(int i = 0; i < orderDetailElements.size(); i++) {
+
+                // Product info
+                List<WebElement> productInfoElements = orderDetailElements.get(i).findElements(By.xpath(".//a[@class='mZ1OWk']"));
+                OrderDetailDTO orderDetail = new OrderDetailDTO();
+                orderDetail.setProductList(new ArrayList<ProductDTO>());
+                for (WebElement productInfoElement : productInfoElements) {
+                    ProductDTO product = new ProductDTO();
+
+                    // Handle gift product
+                    try {
+                        product.setImageUrl(orderDetailElements.get(i).findElement(By.xpath(".//img[@class='gQuHsZ']")).getAttribute("src").toString());
+                        product.setName(orderDetailElements.get(i).findElement(By.xpath(".//span[@class='DWVWOJ']")).getText());
+                    } catch (Exception e) {
+//                    e.printStackTrace();
+                        continue;
+                    }
+
+                    product.setProvidedBy(driver.findElement(By.xpath(".//div[@class='UDaMW3']")).getText().toString());
+
+                    // Handle product option
+                    try {
+                        String productOption = orderDetailElements.get(i).findElement(By.xpath(".//div[@class='rsautk']")).getText().replaceAll("^Phân loại hàng: ","");
+                        product.setProductOption(productOption.substring(0,1).toUpperCase() + productOption.substring(1));
+                    }
+                    catch (Exception e) {
+//                    e.printStackTrace();
+                    }
+
+                    WebElement quantityElement = orderDetailElements.get(i).findElement(By.xpath(".//div[@class='j3I_Nh']"));
+                    product.setQuantity(Integer.parseInt(quantityElement.getText().replaceAll("^x", "")));
+                    orderDetail.getProductList().add(product);
+                }
+
+                WebElement priceElement = orderDetailElements.get(i).findElement(By.xpath(".//span[contains(@class, 'nW_6Oi')]"));
+                orderDetail.setTotalPrice(parseCurrencyToFloat(priceElement.getText()));
+                order.getOrderDetailList().add(orderDetail);
+            }
+
+            // Order status
+            order.setStatus("Success");
+
+            // Order created date
+            WebElement createdDateElement = driver.findElement(By.xpath("//div[@class='stepper__step-date']"));
+            order.setCreatedDate(parseStringToDate(createdDateElement.getText()));
+
+            // Coin
+            try {
+                WebElement coinElement = driver.findElement(By.xpath("//div[contains(@class, 'kW3VDc') and .//span[contains(text(), 'Shopee xu')]]"));
+                order.setCoin(parseCurrencyToFloat(coinElement.findElement(By.xpath(".//div[contains(@class, 'Tfejtu')]"))
+                        .findElement(By.xpath(".//div")).getText().substring(1)));
+            }
+            catch (Exception e) {}
+
+            // Payment method
+            try {
+                WebElement paymentMethodElement = driver.findElement(By.xpath("//div[contains(@class, 'kW3VDc') and .//span[text()='Phương thức Thanh toán']]"));
+                order.setPaymentMethod(paymentMethodElement.findElement(By.xpath(".//div[contains(@class, 'Tfejtu')]"))
+                        .findElement(By.xpath(".//div")).getText());
+            }
+            catch (Exception e) {}
+
+            // Shipping cost
+            try {
+                WebElement shippingCostElement = driver.findElement(By.xpath("//div[contains(@class, 'kW3VDc') and .//span[text()='Phí vận chuyển']]"));
+                order.setShipCost(parseCurrencyToFloat(shippingCostElement.findElement(By.xpath(".//div[contains(@class, 'Tfejtu')]"))
+                        .findElement(By.xpath(".//div")).getText()));
+            }
+            catch (Exception e) {}
+
+            // Shop discount
+            try {
+                WebElement shopDiscountElement = driver.findElement(By.xpath("//div[contains(@class, 'kW3VDc') and .//span[text()='Voucher từ Shop']]"));
+                order.setShopDiscount(parseCurrencyToFloat(shopDiscountElement.findElement(By.xpath(".//div[contains(@class, 'Tfejtu')]"))
+                        .findElement(By.xpath(".//div")).getText().substring(1)));
+            }
+            catch (Exception e) {}
+
+            // Voucher shopee discount
+            try {
+                WebElement voucherDiscountElement = driver.findElement(By.xpath("//div[contains(@class, 'kW3VDc') and .//span[text()='Voucher từ Shopee']]"));
+                order.setVoucherDiscount(parseCurrencyToFloat(voucherDiscountElement.findElement(By.xpath(".//div[contains(@class, 'Tfejtu')]"))
+                        .findElement(By.xpath(".//div")).getText().substring(1)));
+            }
+            catch (Exception e) {}
+
+            // Ship discount
+            try {
+                WebElement shipDiscountElement = driver.findElement(By.xpath("//div[contains(@class, 'kW3VDc') and .//span[text()='Giảm giá phí vận chuyển']]"));
+                order.setShipDiscount(parseCurrencyToFloat(shipDiscountElement.findElement(By.xpath(".//div[contains(@class, 'Tfejtu')]"))
+                        .findElement(By.xpath(".//div")).getText().substring(1)));
+            }
+            catch (Exception e) {}
+
+            // Total cost
+            try {
+                WebElement totalCostElement = driver.findElement(By.xpath("//div[contains(@class, 'kW3VDc') and .//span[text()='Tổng tiền hàng']]"));
+                order.setTotalCost(parseCurrencyToFloat(totalCostElement.findElement(By.xpath(".//div[contains(@class, 'Tfejtu')]"))
+                        .findElement(By.xpath(".//div")).getText()));
+            }
+            catch (Exception e) {}
+
+            // Final cost
+            order.setFinalCost(order.getTotalCost() + order.getShipCost() - order.getShipDiscount() - order.getVoucherDiscount() - order.getShopDiscount() - order.getCoin());
+
+            // Shipping method
+            order.setShippingMethod(new ShippingMethodDTO());
+            order.getShippingMethod().setPrice(order.getShipCost());
+            order.getShippingMethod().setDiscount(order.getShipDiscount());
+            try {
+                WebElement shippedByElement = driver.findElement(By.xpath("//div[@class='Azh6RS']"))
+                        .findElement(By.xpath(".//div"))
+                        .findElement(By.xpath(".//div"));
+                order.getShippingMethod().setShippedBy(shippedByElement.getText());
+            } catch (Exception e) {}
+
+            // User address
+            order.setUserAddress(new UserAddressDTO());
+            WebElement nameElement = driver.findElement(By.xpath("//div[@class='BWtzco']"));
+            List<WebElement> phoneAndAddress = driver.findElement(By.xpath("//div[@class='rRE7pF']")).findElements(By.xpath(".//span"));
+            order.getUserAddress().setName(nameElement.getText());
+            order.getUserAddress().setPhone(phoneAndAddress.get(0).getText());
+            order.getUserAddress().setAddress(phoneAndAddress.get(1).getText());
+
+            orderList.add(order);
+
+            // Back to order list
+            try {
+                WebElement backButton = driver.findElement(By.xpath("//button[@class='yMANId']"));
+                backButton.click();
+            }
+            catch (Exception e) {break;}
+            wait(2);
+//            purchaseOrderLinks = driver.findElements(By.xpath("//a[not(@class='lXbYsi') and contains(@href, '/user/purchase/order')]"));
+        }
+//
+        MessageDTO messageDTO = new MessageDTO("Get order successfully", orderList);
+        return messageDTO;
     }
 
     @Override
-    public String getOrderLazada() {
-        String driverPath = "D:\\ChromeDriver\\chromedriver-win64\\chromedriver.exe";
-        String chromeTestingBinaryPath = "D:\\Chrome\\chrome-win64\\chrome.exe";
-
-        WebDriver driver = initDriver(driverPath, chromeTestingBinaryPath);
+    public String getOrderLazada(AccountDTO accountDTO) {
+        WebDriver driver = initDriver();
         driver.get("https://member.lazada.vn/user/login");
         wait(5);
         String pageSource = driver.getPageSource();
 
         // Enter phone num and pass
         WebElement usernameInput = driver.findElement(By.xpath("//input[@placeholder='Vui lòng nhập số điện thoại hoặc email của bạn']"));
-        usernameInput.sendKeys("trandinhtam8a5@gmail.com");
+        usernameInput.sendKeys(accountDTO.getUsername());
         WebElement passwordInput = driver.findElement(By.xpath("//input[@placeholder='Vui lòng nhập mật khẩu của bạn']"));
-        passwordInput.sendKeys("Dinhtam080803@");
+        passwordInput.sendKeys(accountDTO.getPassword());
         wait(1);
         WebElement loginButton = driver.findElement(By.xpath("//button[text()='ĐĂNG NHẬP']"));
         loginButton.click();
@@ -176,6 +361,7 @@ public class OrderServiceImpl implements OrderService {
         wait(5);
 
         pageSource = driver.getPageSource();
+        driver.quit();
         return pageSource.toString();
     }
 }

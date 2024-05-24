@@ -5,6 +5,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.util.Date;
 import java.util.List;
 
 @Getter
@@ -13,10 +14,17 @@ import java.util.List;
 @NoArgsConstructor
 public class OrderDTO {
     private String status;
-    private String createdDate;
-    private List<OrderDetailDTO> orderDetailDTOList;
+    private List<StatusDetailDTO> statusDetailList;
+    private Date createdDate;
+    private List<OrderDetailDTO> orderDetailList;
     private double coin;
-    private UserAddressDTO userAddressDTO;
-    private ShippingMethodDTO shippingMethodDTO;
-    private PaymentMethodDTO paymentMethodDTO;
+    private UserAddressDTO userAddress;
+    private ShippingMethodDTO shippingMethod;
+    private String paymentMethod;
+    private double totalCost;
+    private double shipCost;
+    private double shipDiscount;
+    private double shopDiscount;
+    private double voucherDiscount;
+    private double finalCost;
 }

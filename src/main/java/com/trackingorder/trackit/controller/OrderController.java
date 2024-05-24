@@ -1,6 +1,7 @@
 package com.trackingorder.trackit.controller;
 
 import com.trackingorder.trackit.dto.AccountDTO;
+import com.trackingorder.trackit.dto.MessageDTO;
 import com.trackingorder.trackit.service.OrderService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -19,15 +20,15 @@ public class OrderController {
         return new ResponseEntity<String>(testString, HttpStatus.OK);
     }
 
-    @GetMapping("/shopee")
-    public ResponseEntity<String> getOrderShopee() {
-        String testString = orderService.getOrderShopee();
-        return new ResponseEntity<String>(testString, HttpStatus.OK);
+    @PostMapping("/shopee")
+    public ResponseEntity<MessageDTO> getOrderShopee(@RequestBody AccountDTO accountDTO) {
+        MessageDTO messageDTO = orderService.getOrderShopee(accountDTO);
+        return new ResponseEntity<MessageDTO>(messageDTO, HttpStatus.OK);
     }
 
-    @GetMapping("/lazada")
-    public ResponseEntity<String> getOrderLazada() {
-        String testString = orderService.getOrderLazada();
+    @PostMapping("/lazada")
+    public ResponseEntity<String> getOrderLazada(@RequestBody AccountDTO accountDTO) {
+        String testString = orderService.getOrderLazada(accountDTO);
         return new ResponseEntity<String>(testString, HttpStatus.OK);
     }
 }

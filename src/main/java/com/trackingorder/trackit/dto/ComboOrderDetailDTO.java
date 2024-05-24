@@ -5,15 +5,13 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.util.List;
+
 @Getter
 @Setter
 @AllArgsConstructor
 @NoArgsConstructor
-public class ProductDTO {
-    private String name;
-    private String providedBy;
-    private String imageUrl;
-    private double price;
-    private String productOption;
-    private int quantity;
+public class ComboOrderDetailDTO implements BaseOrderDetailDTO {
+    private List<OrderDetailDTO> orderDetailList;
+    private double totalPrice;
 }
