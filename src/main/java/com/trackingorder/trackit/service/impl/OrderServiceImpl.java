@@ -320,6 +320,27 @@ public class OrderServiceImpl implements OrderService {
             order.getUserAddress().setPhone(phoneAndAddress.get(0).getText());
             order.getUserAddress().setAddress(phoneAndAddress.get(1).getText());
 
+            // Order status detail list
+            WebElement openFullStatusListButton = driver.findElement(By.xpath("//span[@class='fQNud3']"));
+            openFullStatusListButton.click();
+            wait(1);
+            order.setStatusDetailList(new ArrayList<StatusDetailDTO>());
+            List<WebElement> statusDetailElements = driver.findElements(By.xpath("//div[@class='qhDYac']"));
+            for (WebElement statusDetailElement : statusDetailElements) {
+                StatusDetailDTO statusDetail = new StatusDetailDTO();
+                statusDetail.setDate(parseStringToDate(statusDetailElement.findElement(By.xpath(".//div[@class='e73NiD']")).getText()));
+                List<WebElement> statusDetailContentElement = statusDetailElement.findElement(By.xpath(".//div[@class='LKrsme']"))
+                        .findElements(By.xpath(".//p"));
+                statusDetail.setTitle(statusDetailContentElement.get(0).getText().toString());
+                String contentText = statusDetailContentElement.get(1).getText().toString();
+                int index = contentText.indexOf('\n');
+                if (index != -1) {
+                    contentText = contentText.substring(0,index);
+                }
+                statusDetail.setContent(contentText);
+                order.getStatusDetailList().add(statusDetail);
+            }
+
             orderList.add(order);
 
             // Back to order list
