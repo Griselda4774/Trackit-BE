@@ -132,10 +132,12 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     public MessageDTO getOrderShopee(AccountDTO accountDTO) {
+        // Init chrome driver
         WebDriver driver = initDriver();
+
+        // Access login page
         driver.get("https://shopee.vn/buyer/login");
         wait(5);
-        String pageSource = driver.getPageSource();
 
         // Enter phone num and pass
         WebElement usernameInput = driver.findElement(By.xpath("//input[@placeholder='Email/Số điện thoại/Tên đăng nhập']"));
@@ -147,7 +149,7 @@ public class OrderServiceImpl implements OrderService {
         loginButton.click();
         wait(10);
 
-//         Verify
+        // Verify by email (if have)
         try {
             WebElement verifyButton = driver.findElement(By.xpath("//button[div[text()='Xác minh bằng liên kết Email']]"));
             verifyButton.click();
@@ -157,11 +159,9 @@ public class OrderServiceImpl implements OrderService {
             e.printStackTrace();
         }
 
-
         // Move to order
         driver.get("https://shopee.vn/user/purchase");
         wait(5);
-
 
         // Get order info
         List<WebElement> purchaseOrderLinks;
@@ -173,11 +173,12 @@ public class OrderServiceImpl implements OrderService {
             ((JavascriptExecutor) driver).executeScript("window.scrollTo(0, document.body.scrollHeight);");
             wait(1);
             int newLen = driver.findElements(By.xpath("//a[contains(@href, '/user/purchase/order/')]")).size();
-            if (newLen == orderListSize || orderListSize >= 40)
+            if (newLen == orderListSize || orderListSize >= 10)
                 break;
             else orderListSize = newLen;
         }
 
+        // Get order link
         purchaseOrderLinks = driver.findElements(By.xpath("//a[contains(@href, '/user/purchase/order/')]"));
         List<String> orderHrefs = new ArrayList<>();
         for (WebElement link : purchaseOrderLinks) {
@@ -187,15 +188,16 @@ public class OrderServiceImpl implements OrderService {
         }
 
         for (String orderHref : orderHrefs) {
-//            purchaseOrderLinks.get(i).click();
+            // Access order detail page
             driver.get(orderHref);
             wait(2);
 
+            // Init order list
             OrderDTO order = new OrderDTO();
             order.setOrderDetailList(new ArrayList<OrderDetailDTO>());
 
             // Get order detail info
-            List<WebElement> orderDetailElements = driver.findElements(By.xpath("//section[a[@class='mZ1OWk']]"));
+            List<WebElement> orderDetailElements = driver.findElements(By.xpath("//div[@class='FNHV0p']"));
             for(int i = 0; i < orderDetailElements.size(); i++) {
 
                 // Product info
@@ -207,8 +209,8 @@ public class OrderServiceImpl implements OrderService {
 
                     // Handle gift product
                     try {
-                        product.setImageUrl(orderDetailElements.get(i).findElement(By.xpath(".//img[@class='gQuHsZ']")).getAttribute("src").toString());
-                        product.setName(orderDetailElements.get(i).findElement(By.xpath(".//span[@class='DWVWOJ']")).getText());
+                        product.setImageUrl(productInfoElement.findElement(By.xpath(".//img[@class='gQuHsZ']")).getAttribute("src").toString());
+                        product.setName(productInfoElement.findElement(By.xpath(".//span[@class='DWVWOJ']")).getText());
                     } catch (Exception e) {
 //                    e.printStackTrace();
                         continue;
@@ -216,21 +218,30 @@ public class OrderServiceImpl implements OrderService {
 
                     product.setProvidedBy(driver.findElement(By.xpath(".//div[@class='UDaMW3']")).getText().toString());
 
-                    // Handle product option
+                    // Product option
                     try {
-                        String productOption = orderDetailElements.get(i).findElement(By.xpath(".//div[@class='rsautk']")).getText().replaceAll("^Phân loại hàng: ","");
+                        String productOption = productInfoElement.findElement(By.xpath(".//div[@class='rsautk']")).getText().replaceAll("^Phân loại hàng: ","");
                         product.setProductOption(productOption.substring(0,1).toUpperCase() + productOption.substring(1));
                     }
                     catch (Exception e) {
 //                    e.printStackTrace();
                     }
 
-                    WebElement quantityElement = orderDetailElements.get(i).findElement(By.xpath(".//div[@class='j3I_Nh']"));
+                    // Product quantity
+                    WebElement quantityElement = productInfoElement.findElement(By.xpath(".//div[@class='j3I_Nh']"));
                     product.setQuantity(Integer.parseInt(quantityElement.getText().replaceAll("^x", "")));
+
                     orderDetail.getProductList().add(product);
                 }
 
-                WebElement priceElement = orderDetailElements.get(i).findElement(By.xpath(".//span[contains(@class, 'nW_6Oi')]"));
+                // Order detail price
+                WebElement priceElement;
+                try {
+                    priceElement = orderDetailElements.get(i).findElement(By.xpath(".//span[contains(@class, 'nW_6Oi')]"));
+                }
+                catch (Exception e) {
+                    priceElement = orderDetailElements.get(i).findElement(By.xpath(".//div[contains(@class, 'nW_6Oi')]"));
+                }
                 orderDetail.setTotalPrice(parseCurrencyToFloat(priceElement.getText()));
                 order.getOrderDetailList().add(orderDetail);
             }
@@ -328,7 +339,7 @@ public class OrderServiceImpl implements OrderService {
             List<WebElement> statusDetailElements = driver.findElements(By.xpath("//div[@class='qhDYac']"));
             for (WebElement statusDetailElement : statusDetailElements) {
                 StatusDetailDTO statusDetail = new StatusDetailDTO();
-                statusDetail.setDate(parseStringToDate(statusDetailElement.findElement(By.xpath(".//div[@class='e73NiD']")).getText()));
+                statusDetail.setDate(parseStringToDate(statusDetailElement.findElement(By.xpath(".//div[@class='e73NiD']")).getText().replaceAll("Hôm nay", "00:00")));
                 List<WebElement> statusDetailContentElement = statusDetailElement.findElement(By.xpath(".//div[@class='LKrsme']"))
                         .findElements(By.xpath(".//p"));
                 statusDetail.setTitle(statusDetailContentElement.get(0).getText().toString());
@@ -350,9 +361,9 @@ public class OrderServiceImpl implements OrderService {
             }
             catch (Exception e) {break;}
             wait(2);
-//            purchaseOrderLinks = driver.findElements(By.xpath("//a[not(@class='lXbYsi') and contains(@href, '/user/purchase/order')]"));
         }
-//
+
+        driver.quit();
         MessageDTO messageDTO = new MessageDTO("Get order successfully", orderList);
         return messageDTO;
     }
