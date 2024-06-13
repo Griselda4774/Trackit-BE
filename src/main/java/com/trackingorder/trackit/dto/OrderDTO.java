@@ -12,7 +12,7 @@ import java.util.List;
 @Setter
 @AllArgsConstructor
 @NoArgsConstructor
-public class OrderDTO {
+public class OrderDTO implements BaseOrderDTO {
     private String status;
     private List<StatusDetailDTO> statusDetailList;
     private Date createdDate;

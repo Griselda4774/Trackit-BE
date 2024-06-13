@@ -10,9 +10,6 @@ import org.openqa.selenium.chrome.ChromeDriver;
 import org.openqa.selenium.chrome.ChromeOptions;
 import org.openqa.selenium.interactions.Actions;
 import org.springframework.stereotype.Service;
-
-import java.text.ParsePosition;
-import java.text.SimpleDateFormat;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
@@ -75,7 +72,6 @@ public class OrderServiceImpl implements OrderService {
         return driver;
     }
 
-    @Override
     public String getOrderTiki(AccountDTO accountDTO) {
         WebDriver driver = initDriver();
         driver.get("https://tiki.vn/");
@@ -159,24 +155,24 @@ public class OrderServiceImpl implements OrderService {
             e.printStackTrace();
         }
 
-        // Move to order
-        driver.get("https://shopee.vn/user/purchase");
+        // Move to success order
+        driver.get("https://shopee.vn/user/purchase?type=3");
         wait(5);
 
         // Get order info
         List<WebElement> purchaseOrderLinks;
-        List<OrderDTO> orderList = new ArrayList<OrderDTO>();
-        int orderListSize = 0;
+        List<BaseOrderDTO> orderList = new ArrayList<BaseOrderDTO>();
 
-        while (true) {
-            // Show full order
-            ((JavascriptExecutor) driver).executeScript("window.scrollTo(0, document.body.scrollHeight);");
-            wait(1);
-            int newLen = driver.findElements(By.xpath("//a[contains(@href, '/user/purchase/order/')]")).size();
-            if (newLen == orderListSize || orderListSize >= 10)
-                break;
-            else orderListSize = newLen;
-        }
+//        int orderListSize = 0;
+//        while (true) {
+//            // Show full order
+//            ((JavascriptExecutor) driver).executeScript("window.scrollTo(0, document.body.scrollHeight);");
+//            wait(1);
+//            int newLen = driver.findElements(By.xpath("//a[contains(@href, '/user/purchase/order/')]")).size();
+//            if (newLen == orderListSize || orderListSize >= 2)
+//                break;
+//            else orderListSize = newLen;
+//        }
 
         // Get order link
         purchaseOrderLinks = driver.findElements(By.xpath("//a[contains(@href, '/user/purchase/order/')]"));
@@ -192,7 +188,7 @@ public class OrderServiceImpl implements OrderService {
             driver.get(orderHref);
             wait(2);
 
-            // Init order list
+            // Init order
             OrderDTO order = new OrderDTO();
             order.setOrderDetailList(new ArrayList<OrderDetailDTO>());
 
@@ -357,6 +353,134 @@ public class OrderServiceImpl implements OrderService {
             // Back to order list
             try {
                 WebElement backButton = driver.findElement(By.xpath("//button[@class='yMANId']"));
+                backButton.click();
+            }
+            catch (Exception e) {break;}
+            wait(2);
+        }
+
+
+
+        // *** Cancelled order ***
+
+
+
+        // Move to cancel order
+        driver.get("https://shopee.vn/user/purchase?type=4");
+        wait(5);
+
+        // Get cancel order info
+        List<WebElement> cancelOrderLinks;
+
+//        int cancelOrderListSize = 0;
+//        while (true) {
+//            // Show full cancel order
+//            ((JavascriptExecutor) driver).executeScript("window.scrollTo(0, document.body.scrollHeight);");
+//            wait(1);
+//            int newLen = driver.findElements(By.xpath("//a[contains(@href, '/user/purchase/order/')]")).size();
+//            if (newLen == cancelOrderListSize || cancelOrderListSize >= 10)
+//                break;
+//            else cancelOrderListSize = newLen;
+//        }
+
+        // Get cancel order link
+        cancelOrderLinks = driver.findElements(By.xpath("//a[contains(@href, '/user/purchase/cancellation/')]"));
+        List<String> cancelOrderHrefs = new ArrayList<>();
+        for (WebElement link : cancelOrderLinks) {
+            String href = link.getAttribute("href").toString();
+            if (!cancelOrderHrefs.contains(href))
+                cancelOrderHrefs.add(href);
+        }
+
+        for (String cancelOrderHref : cancelOrderHrefs) {
+            // Access cancel order detail page
+            driver.get(cancelOrderHref);
+            wait(2);
+
+            // Init order
+            CancelledOrderDTO cancelledOrder = new CancelledOrderDTO();
+            cancelledOrder.setOrderDetailList(new ArrayList<OrderDetailDTO>());
+
+            // Show full order detail
+            try {
+                WebElement viewMoreElement = driver.findElement(By.xpath("//div[@class='zuOv5u']"));
+                viewMoreElement.click();
+                wait(1);
+            }
+            catch (Exception e) {}
+
+            // Cancel order details
+            List<WebElement> cancelOrderDetailContainers = driver.findElements(By.xpath("//div[@class='aNNsGB']"));
+            for (WebElement cancelOrderDetailContainer : cancelOrderDetailContainers) {
+                List<WebElement> orderDetailElements = cancelOrderDetailContainer.findElements(By.xpath(".//div[contains(@class, 'vAQAmD')]"));
+                System.out.println("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" + orderDetailElements.size());
+                for (WebElement orderDetailElement : orderDetailElements) {
+                    OrderDetailDTO orderDetail = new OrderDetailDTO();
+
+                    // Product info
+                    orderDetail.setProductList(new ArrayList<ProductDTO>());
+                    ProductDTO product = new ProductDTO();
+                    try {
+                        product.setName(orderDetailElement.findElement(By.xpath(".//div[@class='OvglF_']"))
+                                .findElement(By.xpath(".//span")).getText());
+                    } catch (Exception e){}
+                    product.setProvidedBy(driver.findElement(By.xpath("//div[@class='P8jqjf']")).getText());
+                    product.setImageUrl(orderDetailElement.findElement(By.xpath(".//img")).getAttribute("src").toString());
+                    try {
+                        product.setProductOption(orderDetailElement.findElement(By.xpath(".//div[@class='HszWOL']")).getText());
+                    } catch (Exception e) {}
+                    product.setQuantity(Integer.parseInt(orderDetailElement.findElement(By.xpath(".//div[@class='UOsRMz']"))
+                            .getText().replaceAll("^x", "")));
+
+                    orderDetail.getProductList().add(product);
+                    List<WebElement> priceElements = orderDetailElement.findElement(By.xpath(".//div[@class='pIi9iW']"))
+                            .findElements(By.xpath(".//span"));
+                    orderDetail.setTotalPrice(parseCurrencyToFloat(priceElements.get(priceElements.size() - 1).getText()));
+
+                    cancelledOrder.getOrderDetailList().add(orderDetail);
+                }
+            }
+
+            // Status
+            cancelledOrder.setStatus("Cancelled");
+
+            // Created Date
+            cancelledOrder.setCreatedDate(parseStringToDate(driver.findElement(By.xpath(".//span[@class='gNhiKt']"))
+                    .getText().replaceAll("^Yêu cầu vào: ", "")));
+
+            // Cancelled Date
+            cancelledOrder.setCancelDate(parseStringToDate(driver.findElement(By.xpath(".//div[@class='W8cHm8']"))
+                    .getText().replaceAll("^vào ", "").replaceAll(".$", "")));
+
+            // Payment method
+            try {
+                WebElement paymentMethodElement = driver.findElement(By.xpath("//div[contains(@class, 'FZn8xK') and .//span[text()='Phương thức thanh toán']]"));
+                cancelledOrder.setPaymentMethod(paymentMethodElement.findElement(By.xpath(".//div[@class='mDgIcz']"))
+                        .findElement(By.xpath(".//div")).getText());
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+
+            // Request by
+            try {
+                WebElement requestByElement = driver.findElement(By.xpath("//div[contains(@class, 'FZn8xK') and .//span[text()='Yêu cầu bởi']]"));
+                cancelledOrder.setRequestBy(requestByElement.findElement(By.xpath(".//div[@class='mDgIcz']"))
+                        .findElement(By.xpath(".//div")).getText());
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+
+            // Reason
+           try {
+               WebElement reasonElement = driver.findElement(By.xpath("//div[@class='q_O0YR']"));
+               cancelledOrder.setReason(reasonElement.getText().replaceAll("^Lý do: ", ""));
+           } catch (Exception e) {}
+
+            orderList.add(cancelledOrder);
+
+            // Back to cancelled order list
+            try {
+                WebElement backButton = driver.findElement(By.xpath("//a[@class='JDwDHl']"));
                 backButton.click();
             }
             catch (Exception e) {break;}

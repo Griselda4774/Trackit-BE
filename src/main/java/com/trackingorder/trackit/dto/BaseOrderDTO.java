@@ -1,5 +1,4 @@
 package com.trackingorder.trackit.dto;
 
-public interface BaseOrderDetailDTO {
-
+public interface BaseOrderDTO {
 }

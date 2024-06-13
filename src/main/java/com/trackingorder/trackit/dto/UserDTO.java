@@ -5,13 +5,14 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-import java.util.List;
-
 @Getter
 @Setter
 @AllArgsConstructor
 @NoArgsConstructor
-public class ComboOrderDetailDTO implements BaseOrderDetailDTO {
-    private List<OrderDetailDTO> orderDetailList;
-    private double totalPrice;
+public class UserDTO {
+    private String name;
+    private String username;
+    private String password;
+    private AccountDTO shopeeAccount;
+    private AccountDTO lazadaAccount;
 }
