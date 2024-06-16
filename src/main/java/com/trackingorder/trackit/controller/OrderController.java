@@ -27,8 +27,8 @@ public class OrderController {
     }
 
     @PostMapping("/lazada")
-    public ResponseEntity<String> getOrderLazada(@RequestBody AccountDTO accountDTO) {
-        String testString = orderService.getOrderLazada(accountDTO);
-        return new ResponseEntity<String>(testString, HttpStatus.OK);
+    public ResponseEntity<MessageDTO> getOrderLazada(@RequestBody AccountDTO accountDTO) {
+        MessageDTO messageDTO = orderService.getOrderLazada(accountDTO);
+        return new ResponseEntity<MessageDTO>(messageDTO, HttpStatus.OK);
     }
 }

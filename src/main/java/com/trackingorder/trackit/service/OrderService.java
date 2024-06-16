@@ -7,5 +7,5 @@ public interface OrderService {
 
     public String getOrderTiki(AccountDTO accountDTO);
     public MessageDTO getOrderShopee(AccountDTO accountDTO);
-    public String getOrderLazada(AccountDTO accountDTO);
+    public MessageDTO getOrderLazada(AccountDTO accountDTO);
 }

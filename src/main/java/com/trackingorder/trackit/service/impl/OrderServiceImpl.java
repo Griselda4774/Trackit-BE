@@ -1,6 +1,10 @@
 package com.trackingorder.trackit.service.impl;
 
 import com.trackingorder.trackit.dto.*;
+import com.trackingorder.trackit.entity.AccountEntity;
+import com.trackingorder.trackit.entity.UserEntity;
+import com.trackingorder.trackit.repository.AccountRepository;
+import com.trackingorder.trackit.repository.UserRepository;
 import com.trackingorder.trackit.service.OrderService;
 import org.openqa.selenium.By;
 import org.openqa.selenium.JavascriptExecutor;
@@ -9,7 +13,11 @@ import org.openqa.selenium.WebElement;
 import org.openqa.selenium.chrome.ChromeDriver;
 import org.openqa.selenium.chrome.ChromeOptions;
 import org.openqa.selenium.interactions.Actions;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
@@ -18,6 +26,14 @@ import java.util.concurrent.TimeUnit;
 
 @Service
 public class OrderServiceImpl implements OrderService {
+    private UserRepository userRepository;
+    private AccountRepository accountRepository;
+
+    public OrderServiceImpl(UserRepository userRepository, AccountRepository accountRepository) {
+        this.userRepository = userRepository;
+        this.accountRepository = accountRepository;
+    }
+
     private static void wait(int sec) {
         try {
             TimeUnit.SECONDS.sleep(sec);
@@ -35,6 +51,18 @@ public class OrderServiceImpl implements OrderService {
         String cleanedString = currencyString.replace("₫", "").trim();
         cleanedString = cleanedString.replace(".", "");
         return Float.parseFloat(cleanedString);
+    }
+
+    public static String convertDateFormat(String originalDate) {
+        SimpleDateFormat inputFormat = new SimpleDateFormat("dd 'thg' M yyyy HH:mm:ss", Locale.forLanguageTag("vi"));
+        SimpleDateFormat outputFormat = new SimpleDateFormat("HH:mm dd-MM-yyyy");
+        try {
+            Date date = inputFormat.parse(originalDate);
+            return outputFormat.format(date);
+        } catch (ParseException e) {
+            e.printStackTrace();
+            return null;
+        }
     }
 
     public static Date parseStringToDate(String dateString) {
@@ -128,6 +156,7 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     public MessageDTO getOrderShopee(AccountDTO accountDTO) {
+        AccountEntity accountEntity = accountRepository.findById(userRepository.findByUsername(accountDTO.getUsername()).get().getShopeeAccountId()).get();
         // Init chrome driver
         WebDriver driver = initDriver();
 
@@ -137,9 +166,9 @@ public class OrderServiceImpl implements OrderService {
 
         // Enter phone num and pass
         WebElement usernameInput = driver.findElement(By.xpath("//input[@placeholder='Email/Số điện thoại/Tên đăng nhập']"));
-        usernameInput.sendKeys(accountDTO.getUsername());
+        usernameInput.sendKeys(accountEntity.getUsername());
         WebElement passwordInput = driver.findElement(By.xpath("//input[@placeholder='Mật khẩu']"));
-        passwordInput.sendKeys(accountDTO.getPassword());
+        passwordInput.sendKeys(accountEntity.getPassword());
         wait(1);
         WebElement loginButton = driver.findElement(By.xpath("//button[text()='Đăng nhập']"));
         loginButton.click();
@@ -413,7 +442,6 @@ public class OrderServiceImpl implements OrderService {
             List<WebElement> cancelOrderDetailContainers = driver.findElements(By.xpath("//div[@class='aNNsGB']"));
             for (WebElement cancelOrderDetailContainer : cancelOrderDetailContainers) {
                 List<WebElement> orderDetailElements = cancelOrderDetailContainer.findElements(By.xpath(".//div[contains(@class, 'vAQAmD')]"));
-                System.out.println("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" + orderDetailElements.size());
                 for (WebElement orderDetailElement : orderDetailElements) {
                     OrderDetailDTO orderDetail = new OrderDetailDTO();
 
@@ -493,7 +521,9 @@ public class OrderServiceImpl implements OrderService {
     }
 
     @Override
-    public String getOrderLazada(AccountDTO accountDTO) {
+    public MessageDTO getOrderLazada(AccountDTO accountDTO) {
+        AccountEntity accountEntity = accountRepository.findById(userRepository.findByUsername(accountDTO.getUsername()).get().getLazadaAccountId()).get();
+
         WebDriver driver = initDriver();
         driver.get("https://member.lazada.vn/user/login");
         wait(5);
@@ -501,23 +531,71 @@ public class OrderServiceImpl implements OrderService {
 
         // Enter phone num and pass
         WebElement usernameInput = driver.findElement(By.xpath("//input[@placeholder='Vui lòng nhập số điện thoại hoặc email của bạn']"));
-        usernameInput.sendKeys(accountDTO.getUsername());
+        usernameInput.sendKeys(accountEntity.getUsername());
         WebElement passwordInput = driver.findElement(By.xpath("//input[@placeholder='Vui lòng nhập mật khẩu của bạn']"));
-        passwordInput.sendKeys(accountDTO.getPassword());
+        passwordInput.sendKeys(accountEntity.getPassword());
         wait(1);
         WebElement loginButton = driver.findElement(By.xpath("//button[text()='ĐĂNG NHẬP']"));
         loginButton.click();
         wait(5);
 
-        // Solve CAPTCHA
-        wait(10);
-
         // Move to order
-
+        driver.get("https://my.lazada.vn/customer/order/index/");
         wait(5);
 
-        pageSource = driver.getPageSource();
-        driver.quit();
-        return pageSource.toString();
+        List<BaseOrderDTO> orderList = new ArrayList<BaseOrderDTO>();
+
+        // List item to navigate to completed order detail
+        List<WebElement> completedOrderElements = driver.findElements(By.xpath("//div[contains(@class, 'shop-right-status') and contains(text(), 'Đã giao hàng')]"));
+
+        // Get order detail
+        List<BaseOrderDTO> listSuccessOrder = new ArrayList<BaseOrderDTO>();
+        for (WebElement completedOrderElement : completedOrderElements) {
+            OrderDTO order = new OrderDTO();
+            completedOrderElement.click();
+
+            // Navigate to order detail tab
+            Set<String> allWindowHandles = driver.getWindowHandles();
+            List<String> windowHandlesList = new ArrayList<>(allWindowHandles);
+
+            String firstTabHandle = windowHandlesList.get(0);
+            String secondTabHandle = windowHandlesList.get(1);
+
+            driver.switchTo().window(secondTabHandle);
+            wait(5);
+
+            // Order status
+            order.setStatus("Success");
+
+            // Date created
+            WebElement createdDateElement = driver.findElement(By.xpath("//p[@class='text desc light-gray desc-margin']"));
+            order.setCreatedDate(parseStringToDate(convertDateFormat(createdDateElement.getText().trim().replaceAll("^Đặt ngày\\s*", ""))));
+
+            // Coin
+            try {
+                WebElement coinElement = driver.findElement(By.xpath("//div[@class='row'] and .//span[text()='xu]"));
+                order.setCoin(parseCurrencyToFloat(coinElement.getText().substring(1)));
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+
+            // User address
+            UserAddressDTO userAddressDTO = new UserAddressDTO();
+            WebElement userAddressElement = driver.findElement(By.xpath("//div[@class='delivery-wrapper']"));
+            userAddressDTO.setName(userAddressElement.findElement(By.xpath(".//span[@class='username']")).getText());
+            userAddressDTO.setAddress(userAddressElement.findElement(By.xpath(".//span[@class='in-line']")).getText());
+            userAddressDTO.setPhone(userAddressElement.findElements(By.xpath(".//span")).get(2).getText());
+
+            orderList.add(order);
+            driver.close();
+
+            // Back to order list tab
+            driver.switchTo().window(firstTabHandle);
+            wait(5);
+        }
+
+//        driver.quit();
+        MessageDTO messageDTO = new MessageDTO("Get order successfully", orderList);
+        return messageDTO;
     }
 }

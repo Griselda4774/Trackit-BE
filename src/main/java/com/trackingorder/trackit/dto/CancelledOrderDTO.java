@@ -17,7 +17,7 @@ public class CancelledOrderDTO implements BaseOrderDTO {
     private Date createdDate;
     private List<OrderDetailDTO> orderDetailList;
     private String paymentMethod;
-    private Date cancelDate;
+    private Date cancelDate;    
     private String requestBy;
     private String reason;
 }
