@@ -2,7 +2,6 @@ package com.trackingorder.trackit.service.impl;
 
 import com.trackingorder.trackit.dto.*;
 import com.trackingorder.trackit.entity.AccountEntity;
-import com.trackingorder.trackit.entity.UserEntity;
 import com.trackingorder.trackit.repository.AccountRepository;
 import com.trackingorder.trackit.repository.UserRepository;
 import com.trackingorder.trackit.service.OrderService;
@@ -13,7 +12,6 @@ import org.openqa.selenium.WebElement;
 import org.openqa.selenium.chrome.ChromeDriver;
 import org.openqa.selenium.chrome.ChromeOptions;
 import org.openqa.selenium.interactions.Actions;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.text.ParseException;
@@ -63,6 +61,25 @@ public class OrderServiceImpl implements OrderService {
             e.printStackTrace();
             return null;
         }
+    }
+
+    public static String convertDateFormatLazada(String originalDate, Date dateWithYear) {
+        SimpleDateFormat inputFormat = new SimpleDateFormat("dd/MM HH:mm", Locale.forLanguageTag("vi"));
+        SimpleDateFormat outputFormat = new SimpleDateFormat("HH:mm dd-MM-yyyy");
+        try {
+            Date date = inputFormat.parse(originalDate);
+            Calendar calendar = Calendar.getInstance();
+            calendar.setTime(dateWithYear);
+            int year = calendar.get(Calendar.YEAR);
+            calendar.setTime(date);
+            calendar.set(Calendar.YEAR, year);
+            Date newDate = calendar.getTime();
+            return outputFormat.format(newDate);
+        } catch (ParseException e) {
+            e.printStackTrace();
+            return null;
+        }
+
     }
 
     public static Date parseStringToDate(String dateString) {
@@ -543,16 +560,20 @@ public class OrderServiceImpl implements OrderService {
         driver.get("https://my.lazada.vn/customer/order/index/");
         wait(5);
 
-        List<BaseOrderDTO> orderList = new ArrayList<BaseOrderDTO>();
+        // Button navigation
+        List<WebElement> buttonNavigationElements = driver.findElements(By.xpath("//button[@class='next-btn next-btn-normal next-btn-small next-pagination-item']"));
+        buttonNavigationElements.get(0).click();
+        wait(5);
 
         // List item to navigate to completed order detail
-        List<WebElement> completedOrderElements = driver.findElements(By.xpath("//div[contains(@class, 'shop-right-status') and contains(text(), 'Đã giao hàng')]"));
+        List<WebElement> completedOrderElements = driver.findElements(By.xpath("//div[contains(@tag, 'order-component') and .//div[contains(@class, 'shop-right-status') and contains(text(), 'Đã giao hàng')]]"));
 
         // Get order detail
         List<BaseOrderDTO> listSuccessOrder = new ArrayList<BaseOrderDTO>();
         for (WebElement completedOrderElement : completedOrderElements) {
             OrderDTO order = new OrderDTO();
             completedOrderElement.click();
+            wait(1);
 
             // Navigate to order detail tab
             Set<String> allWindowHandles = driver.getWindowHandles();
@@ -571,22 +592,170 @@ public class OrderServiceImpl implements OrderService {
             WebElement createdDateElement = driver.findElement(By.xpath("//p[@class='text desc light-gray desc-margin']"));
             order.setCreatedDate(parseStringToDate(convertDateFormat(createdDateElement.getText().trim().replaceAll("^Đặt ngày\\s*", ""))));
 
+            // Total cost
+            try {
+                WebElement totalCostElement = driver.findElement(By.xpath("//div[contains(@class, 'row') and .//span[contains(text(), 'Tổng Tiền')]]"));
+                order.setTotalCost(parseCurrencyToFloat(totalCostElement.findElement(By.xpath(".//span[@class='text price pull-right']")).getText()));
+            } catch (Exception e) {
+//                e.printStackTrace();
+            }
+
+            // Ship cost
+            try {
+                WebElement shipCostElement = driver.findElement(By.xpath("//div[contains(@class, 'row') and .//span[contains(text(), 'Phí vận chuyển')]]"));
+                order.setShipCost(parseCurrencyToFloat(shipCostElement.findElement(By.xpath(".//span[@class='text price pull-right']")).getText()));
+            } catch (Exception e) {
+//                e.printStackTrace();
+            }
+
+            // Ship discount
+            try {
+                WebElement shipDiscountElement = driver.findElement(By.xpath("//div[contains(@class, 'row') and .//span[contains(text(), 'Voucher Miễn Phí Vận Chuyển')]]"));
+                order.setShipDiscount(parseCurrencyToFloat(shipDiscountElement.findElement(By.xpath(".//span[@class='text price pull-right']")).getText().substring(1)));
+            } catch (Exception e) {
+//                e.printStackTrace();
+            }
+
+            // Voucher discount
+            double voucherDiscount1 = 0;
+            double voucherDiscount2 = 0;
+
+            try {
+                WebElement voucherDiscountElement1 = driver.findElement(By.xpath("//div[contains(@class, 'row') and .//span[contains(text(), 'Voucher Tích Lũy')]]"));
+                voucherDiscount1 = parseCurrencyToFloat(voucherDiscountElement1.findElement(By.xpath(".//span[@class='text price pull-right']")).getText().substring(1));
+            } catch (Exception e) {
+//                e.printStackTrace();
+            }
+
+            try {
+                WebElement voucherDiscountElement2 = driver.findElement(By.xpath("//div[contains(@class, 'row') and .//span[contains(text(), 'Voucher Lazada')]]"));
+                voucherDiscount2 = parseCurrencyToFloat(voucherDiscountElement2.findElement(By.xpath(".//span[@class='text price pull-right']")).getText().substring(1));
+            } catch (Exception e) {
+//                e.printStackTrace();
+            }
+            order.setVoucherDiscount(voucherDiscount1 + voucherDiscount2);
+
+            // Shop discount
+            double shopDiscount1 = 0;
+            double shopDiscount2 = 0;
+
+            try {
+                WebElement shopDiscountElement1 = driver.findElement(By.xpath("//div[contains(@class, 'row') and .//span[contains(text(), 'Voucher Từ Cửa Hàng')]]"));
+                shopDiscount1 = parseCurrencyToFloat(shopDiscountElement1.findElement(By.xpath(".//span[@class='text price pull-right']")).getText().substring(1));
+            } catch (Exception e) {
+//                e.printStackTrace();
+            }
+
+            try {
+                WebElement shopDiscountElement2 = driver.findElement(By.xpath("//div[contains(@class, 'row') and .//span[contains(text(), 'Khuyến mãi của nhà bán hàng')]]"));
+                shopDiscount2 = parseCurrencyToFloat(shopDiscountElement2.findElement(By.xpath(".//span[@class='text price pull-right']")).getText().substring(1));
+            } catch (Exception e) {
+//                e.printStackTrace();
+            }
+            order.setShopDiscount(shopDiscount1 + shopDiscount2);
+
+            // Payment method
+            try {
+                WebElement paymentMethodElement = driver.findElement(By.xpath("//div[contains(@class, 'row') and .//span[contains(text(), 'Thanh toán bằng hình thức')]]"));
+                order.setPaymentMethod(paymentMethodElement.findElement(By.xpath(".//span[@class='text bold']")).getText());
+            } catch (Exception e) {
+//                e.printStackTrace();
+            }
+
             // Coin
             try {
-                WebElement coinElement = driver.findElement(By.xpath("//div[@class='row'] and .//span[text()='xu]"));
-                order.setCoin(parseCurrencyToFloat(coinElement.getText().substring(1)));
+                WebElement coinElement = driver.findElement(By.xpath("//div[contains(@class, 'row') and .//span[contains(text(), 'xu')]]"));
+                order.setCoin(parseCurrencyToFloat(coinElement.findElement(By.xpath(".//span[@class='text price pull-right']")).getText().substring(1)));
             } catch (Exception e) {
                 e.printStackTrace();
             }
+
+            // Final cost
+            try {
+                WebElement finalCostElement = driver.findElement(By.xpath("//div[contains(@class, 'row second-header') and .//span[contains(text(), 'Tổng cộng')]]"));
+                order.setFinalCost(parseCurrencyToFloat(finalCostElement.findElement(By.xpath(".//span[@class='text bold total-price pull-right']")).getText()));
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+
+            // Order detail list
+            List<OrderDetailDTO> orderDetailDTOList = new ArrayList<OrderDetailDTO>();
+
+            List<WebElement> productElements = driver.findElements(By.xpath("//div[@class='order-item']"));
+            for (WebElement productElement : productElements) {
+                OrderDetailDTO orderDetail = new OrderDetailDTO();
+                orderDetail.setProductList(new ArrayList<ProductDTO>());
+
+                // Product info
+                ProductDTO product = new ProductDTO();
+                // Product image
+                product.setImageUrl(productElement.findElement(By.xpath(".//img")).getAttribute("src"));
+                // Product name
+                product.setName(productElement.findElement(By.xpath(".//div[@class='text title item-title']"))
+                        .findElement(By.xpath(".//a")).getText());
+                // Provided by
+                product.setProvidedBy(driver.findElement(By.xpath("//div[@class='shop-left-info-name']")).getText());
+                // Product option
+                try {
+                    product.setProductOption(productElement.findElement(By.xpath(".//div[@class='item-sku']")).getText());
+
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+                // Product quantity
+                product.setQuantity(Integer.parseInt(productElement.findElement(By.xpath(".//div[@class='item-quantity']"))
+                        .findElement(By.xpath(".//span"))
+                        .findElements(By.xpath(".//span")).get(1).getText().replaceAll("\u00A0", "").trim()));
+
+                orderDetail.getProductList().add(product);
+                // Product price
+                try {
+                    orderDetail.setTotalPrice(parseCurrencyToFloat(productElement.findElement(By.xpath(".//div[@class='item-price text bold']")).getText()));
+                } catch (Exception e) {
+                    orderDetail.setTotalPrice(0.0);
+                }
+
+                // Add order detail to order detail list
+                orderDetailDTOList.add(orderDetail);
+            }
+
+            // Add order detail list to order
+            order.setOrderDetailList(orderDetailDTOList);
 
             // User address
             UserAddressDTO userAddressDTO = new UserAddressDTO();
             WebElement userAddressElement = driver.findElement(By.xpath("//div[@class='delivery-wrapper']"));
             userAddressDTO.setName(userAddressElement.findElement(By.xpath(".//span[@class='username']")).getText());
             userAddressDTO.setAddress(userAddressElement.findElement(By.xpath(".//span[@class='in-line']")).getText());
-            userAddressDTO.setPhone(userAddressElement.findElements(By.xpath(".//span")).get(2).getText());
+            userAddressDTO.setPhone(userAddressElement.findElements(By.xpath(".//span")).get(4).getText());
+            order.setUserAddress(userAddressDTO);
 
-            orderList.add(order);
+            // Shipping method and status list
+            WebElement trackDeliveryElement = driver.findElement(By.xpath("//div[@class='delivery-track']")).findElement(By.xpath(".//a"));
+            trackDeliveryElement.click();
+            wait(5);
+
+            // Shipping method
+            ShippingMethodDTO shippingMethodDTO = new ShippingMethodDTO();
+            shippingMethodDTO.setShippedBy(driver.findElement(By.xpath("//p[@class='courier-detail-info']")).getText().replaceAll("^Đơn vị vận chuyển: ", ""));
+            shippingMethodDTO.setPrice(order.getShipCost());
+            shippingMethodDTO.setDiscount(order.getShipDiscount());
+
+            order.setShippingMethod(shippingMethodDTO);
+
+            // Status detail list
+            List<StatusDetailDTO> statusDetailDTOList = new ArrayList<StatusDetailDTO>();
+            List<WebElement> statusDetailElements = driver.findElements(By.xpath("//li[@class='shipping-item']"));
+            for (WebElement statusDetailElement : statusDetailElements) {
+                StatusDetailDTO statusDetailDTO = new StatusDetailDTO();
+                statusDetailDTO.setDate(parseStringToDate(convertDateFormatLazada(statusDetailElement.findElement(By.xpath(".//div[@class='shipping-time'] | .//div[@class='shipping-time gray']")).getText(), order.getCreatedDate())));
+                statusDetailDTO.setTitle(statusDetailElement.findElement(By.xpath(".//p[@class='shipping-info-title']")).getText());
+                statusDetailDTO.setContent(statusDetailElement.findElement(By.xpath(".//p[@class='shipping-info-desc']")).getText());
+                statusDetailDTOList.add(statusDetailDTO);
+            }
+            order.setStatusDetailList(statusDetailDTOList);
+
+            listSuccessOrder.add(order);
             driver.close();
 
             // Back to order list tab
@@ -595,7 +764,7 @@ public class OrderServiceImpl implements OrderService {
         }
 
 //        driver.quit();
-        MessageDTO messageDTO = new MessageDTO("Get order successfully", orderList);
+        MessageDTO messageDTO = new MessageDTO("Get order successfully", listSuccessOrder);
         return messageDTO;
     }
 }
