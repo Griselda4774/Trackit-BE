@@ -1,5 +1,6 @@
 package com.trackingorder.trackit.controller;
 
+import com.trackingorder.trackit.dto.MessageDTO;
 import com.trackingorder.trackit.dto.UserDTO;
 import com.trackingorder.trackit.service.AuthenticationService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -36,15 +37,15 @@ public class AuthenticationController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<String> login(@RequestBody Map<String, String> body) {
+    public ResponseEntity<MessageDTO> login(@RequestBody Map<String, String> body) {
         String username = body.get("username");
         String password = body.get("password");
 
-        String result = authenticationService.login(username, password);
+        MessageDTO result = authenticationService.login(username, password);
 
-        if (result.equals("Login successfully!")) {
-            return ResponseEntity.ok(result);
+        if (result.getMessage().equals("Login successfully!")) {
+            return new ResponseEntity<MessageDTO>(result, HttpStatus.OK);
         }
-        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(result);
+        return new ResponseEntity<MessageDTO>(result, HttpStatus.UNAUTHORIZED);
     }
 }

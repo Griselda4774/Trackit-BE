@@ -13,6 +13,8 @@ public class UserController {
     @Autowired
     private UserService userService;
 
+    @GetMapping
+
     @PutMapping("/accounts/lazada/{username}")
     public ResponseEntity<String> updateLazadaAccount(
             @PathVariable String username,
